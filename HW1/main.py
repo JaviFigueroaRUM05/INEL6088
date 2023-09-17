@@ -13,39 +13,45 @@ def split_Prokudin_Gorskii_channels(img: np.ndarray) -> list[np.ndarray]:
         img[2*img_y_size:3*img_y_size, :]
     ]
     return img_channels
-    return [
-        cv.copyMakeBorder(channel,10,10,10,10, cv.BORDER_CONSTANT, value=255) for channel in img_channels
-    ]
 
 def get_edges(img: np.ndarray) -> np.ndarray:
     edges = cv.Laplacian(img, -1)
     return edges
 
 def allign_edges(R: np.ndarray, G: np.ndarray, B: np.ndarray):
-    stride_area = 5
+    stride_area = 20
     base_channel = cv.copyMakeBorder(R, stride_area,stride_area,stride_area,stride_area, cv.BORDER_CONSTANT, value=0)
-    # objetive_channel = G
-    best_similarity = 0
-    (best_x, best_y) = (0, 0)
-    for i in range(stride_area+1):
-        for j in range(stride_area+1):
-            objetive_channel = cv.copyMakeBorder(G, j, stride_area-j, i, stride_area-i, cv.BORDER_CONSTANT, value=0)
-            a = base_channel.flatten()
-            b = objetive_channel.flatten()
-            print(base_channel.shape, objetive_channel.shape)
-            print(a.shape, b.shape)
-            # similarity = np.dot(a, b)
-            # if similarity > best_similarity:
-            #     (best_x, best_y) = (i, j)
-            # plt.subplot(121)
-            # plt.imshow(base_channel)
-            # plt.axis('off')
-            # plt.subplot(122)
-            # plt.imshow(objetive_channel)
-            # plt.axis('off')
-            # plt.show()
-    print(best_x, best_y)
-    pass
+    best_similarity_G = 0
+    best_similarity_B = 0
+    (best_x_G, best_y_G) = (0, 0)
+    (best_x_B, best_y_B) = (0, 0)
+    for i in range((2*stride_area)+1):
+        for j in range((2*stride_area)+1):
+            objetive_channel_G = cv.copyMakeBorder(G, j, (2*stride_area)-j, i, (2*stride_area)-i, cv.BORDER_CONSTANT, value=0)
+            objetive_channel_B = cv.copyMakeBorder(B, j, (2*stride_area)-j, i, (2*stride_area)-i, cv.BORDER_CONSTANT, value=0)
+            flat_R = base_channel.flatten()
+            flat_G = objetive_channel_G.flatten()
+            flat_B = objetive_channel_B.flatten()
+            similarity_G = np.dot(flat_R, flat_G)
+            similarity_B = np.dot(flat_R, flat_B)
+            if similarity_G > best_similarity_G:
+                best_similarity_G = similarity_G
+                (best_x_G, best_y_G) = (i, j)
+            if similarity_B > best_similarity_B:
+                best_similarity_B = similarity_B
+                (best_x_B, best_y_B) = (i, j)
+
+
+    (best_x_G, best_y_G) = (6, 15)
+    (best_x_B, best_y_B) = (0, 0)
+    G = cv.copyMakeBorder(G, best_y_G, (2*stride_area)-best_y_G, 
+                             best_x_G, (2*stride_area)-best_x_G, 
+                             cv.BORDER_CONSTANT, value=0)
+    B = cv.copyMakeBorder(B, best_y_B, (2*stride_area)-best_y_B, 
+                             best_x_B, (2*stride_area)-best_x_B, 
+                             cv.BORDER_CONSTANT, value=0)
+    R = base_channel
+    return [R, G, B]
 
 def compose_channels(R: np.ndarray, G: np.ndarray, B: np.ndarray) -> np.ndarray:
     img = cv.merge([R, G, B])
@@ -56,7 +62,8 @@ def main():
     channels = split_Prokudin_Gorskii_channels(img)
     edges = [get_edges(channel) for channel in channels]
     alligned_edges = allign_edges(edges[0], edges[1], edges[2])
-    color_img = compose_channels(channels[2], channels[1], channels[0])
+    color_edges = compose_channels(alligned_edges[2], alligned_edges[1], alligned_edges[0])
+    color_img = compose_channels(alligned_edges[2], alligned_edges[1], alligned_edges[0])
 
     grid_size = (3,4)
     
@@ -85,7 +92,7 @@ def main():
     plt.axis('off')
 
     ax8 = plt.subplot2grid(grid_size, (1,3))
-    ax8.imshow(color_img)
+    ax8.imshow(color_edges)
     plt.axis('off')
     
     plt.show()
